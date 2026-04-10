@@ -1,0 +1,16 @@
+# Python virtual environments
+ai4chem/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
