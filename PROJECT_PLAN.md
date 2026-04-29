@@ -79,9 +79,9 @@ The dataset comes from a multi-site LC-MS glycomics study with three biological 
 
 | Class Label | Group | Description |
 |-------------|-------|-------------|
-| `D` (Disease) | French cohort | Confirmed lung cancer patients |
-| `B` (Benign) | LMU cohort | Patients with benign pulmonary disease |
-| `C` (Control) | Dunn cohort | Healthy volunteers |
+| `French` | French cohort | Confirmed lung cancer patients (Disease) |
+| `LMU` | LMU cohort | Patients with benign pulmonary disease (Benign) |
+| `Dunn` | Dunn cohort | Healthy volunteers (Control) |
 
 In addition to biological samples, the dataset contains several types of quality control samples:
 
@@ -90,14 +90,14 @@ In addition to biological samples, the dataset contains several types of quality
 | `QC` | Pooled quality control — injected repeatedly across batches to assess instrument stability |
 | `dQC` | Diluted quality control — used to assess linearity and signal dynamic range |
 | `SS` | System suitability — verifies instrument performance before each batch |
-| `B` (Blank) | Solvent blank — identifies background/contaminant signals |
+| `B` | Solvent blank — identifies background/contaminant signals (note: `B` in the data means Blank, not Benign) |
 
 ### Data Files
 
 | File | Description |
 |------|-------------|
 | `data/input/data_matrix.csv` | N × M matrix of LC-MS peak intensities. Rows = samples, columns = feature IDs (e.g., FT-000, FT-001, …). Values are integrated peak areas. |
-| `data/input/sample_metadata.csv` | One row per sample. Columns: sample ID, class label, batch number, run order. |
+| `data/input/acquisition_list.csv` | One row per sample. Columns: sample ID, class label, batch number, run order. |
 | `data/input/feature_metadata.csv` | One row per feature. Columns: feature ID, m/z (mean, min, max, std), retention time (mean, min, max, std, start, end). |
 | `data/input/exogenous_standards.csv` | Reference table of spiked-in exogenous glycan standards (GU4, GU5, GU14, GU15, …) with known m/z and expected retention times. Used to verify instrument calibration. |
 | `data/glycan_embedding/glycan_list.csv` | Annotated list of glycan sequences identified from the LC-MS data. Columns: IUPAC sequence notation, monosaccharide composition (dHex, Hex, HexNAc, Neu5Ac counts), tissue species, tissue sample type. |
@@ -123,7 +123,7 @@ In addition to biological samples, the dataset contains several types of quality
 
 #### 1.1 Data Loading & Inspection
 
-- Load `data_matrix.csv`, `sample_metadata.csv`, and `feature_metadata.csv` into pandas DataFrames
+- Load `data_matrix.csv`, `acquisition_list.csv`, and `feature_metadata.csv` into pandas DataFrames
 - Verify alignment between sample IDs in the data matrix and metadata
 - Report: number of samples per class, number of features, proportion of missing values (zeros treated as missing in LC-MS), batch composition
 
@@ -238,11 +238,14 @@ LC-MS data contains structural zeros (feature genuinely absent) and technical ze
 - Visualise: boxplots of feature intensities per sample before and after transformation
 - Confirm: reduced variance spread and improved inter-sample comparability
 
-#### 2.5 Batch Correction (if needed)
+#### 2.5 Run-order Drift Assessment (if needed)
 
-- Assess residual batch effects post-normalisation via PCA (colour by batch)
-- If batch effects remain: apply **ComBat** (empirical Bayes batch correction from `pyComBat` or `statsmodels`) using QC samples as reference
-- Visualise: PCA before and after batch correction
+The analysis is restricted to batch 1, so inter-batch correction (e.g. ComBat) is not applicable. However, within a single batch, instrument signal can drift systematically across run order as the column degrades or detector sensitivity changes. This is assessed using the QC samples, which were injected at regular intervals specifically to track this effect.
+
+- Plot mean QC intensity per feature across run order and fit a LOWESS trend
+- If a significant trend is detected, apply QC-based signal correction: for each feature, divide sample intensities by the interpolated QC trend at the corresponding run order position
+- Visualise: QC intensity vs run order before and after correction
+- If no trend is detected, document this and proceed without correction
 
 ---
 
