@@ -1,9 +1,3 @@
-&nbsp;
-
-[<img src="public/221006-logo-isospec-color.jpg" width="200" align="right">]()
-
-&nbsp;
-
 # AI for Chemistry: Glycan Biomarker Discovery for Lung Cancer Detection
 
 &nbsp;
