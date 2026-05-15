@@ -2,7 +2,7 @@
 
 &nbsp;
 
-A machine learning pipeline for discovery and molecular interpretation of glycan biomarkers in LC-MS data from a multi-cohort lung cancer study. Data was provided by [Isospec](https://isospec.io/), a biotech startup specializing in glycan characterization technology.
+A machine learning pipeline for discovery and molecular interpretation of glycan biomarkers in LC-MS data from a multi-cohort lung cancer study. Data was provided by Isospec, a biotech startup specializing in glycan characterization technology.
 
 ---
 
@@ -233,4 +233,4 @@ Core libraries used:
 - [Coefficient of Variation in LC-MS](https://pmc.ncbi.nlm.nih.gov/articles/PMC3695475/)
 - [Glycan Analysis Review](https://www.mdpi.com/2218-273X/13/4/605)
 - [Glycowork library](https://github.com/BojarLab/glycowork)
-- [Isospec — CIRIS technology](https://isospec.io/)
+- Isospec — CIRIS technology
