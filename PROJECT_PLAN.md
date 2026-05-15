@@ -17,7 +17,7 @@
    - [Phase 2: Data Quality Control & Filtering](#phase-2-data-quality-control--filtering)
    - [Phase 3: Statistical & Discriminatory Analysis](#phase-3-statistical--discriminatory-analysis)
    - [Phase 4: Machine Learning Classification](#phase-4-machine-learning-classification)
-   - [Phase 5: Glycan Embedding & Biological Interpretation](#phase-5-glycan-embedding--biological-interpretation)
+   - [Phase 5: Molecular Representations, Structure-based ML & Biological Interpretation](#phase-5-molecular-representations-structure-based-ml--biological-interpretation)
    - [Phase 6: Visualization & Summary](#phase-6-visualization--summary)
 6. [Tools & Libraries](#6-tools--libraries)
 7. [Expected Outcomes](#7-expected-outcomes)
@@ -360,9 +360,15 @@ Apply SHAP (SHapley Additive exPlanations) to the best-performing model:
 
 ---
 
-### Phase 5: Glycan Embedding & Biological Interpretation
+### Phase 5: Molecular Representations, Structure-based ML & Biological Interpretation
 
-**Goal:** Use the `glycowork` library to enrich identified glycans with structural and biological context, generate a glycan embedding space, and interpret the molecular biology underlying the biomarker candidates.
+**Goal:** Demonstrate the full AI-for-chemistry pipeline at the molecular structure level — representing glycans as graphs and structural fingerprints, training a disease-association classifier from molecular structure alone (independent of the LC-MS intensities), and placing the discovered biomarkers in a learned structural embedding space.
+
+This phase directly addresses the course's central themes: **molecular representations** (Week 1), **supervised ML on chemical structure** (Week 2), and **unsupervised chemical space exploration** (Week 4).
+
+> **Implementation note:** PyTorch / torch_geometric are not required. All steps use glycowork's non-neural-network tools (`glycan_to_nxGraph`, `annotate_dataset`) combined with XGBoost and UMAP — all confirmed available in the project environment.
+
+---
 
 #### 5.1 Glycan Sequence Loading & Annotation
 
@@ -373,37 +379,104 @@ Apply SHAP (SHapley Additive exPlanations) to the best-performing model:
   - Tissue species and tissue sample type
 - Summarise composition statistics: distributions of each monosaccharide count
 
-#### 5.2 Biological Enrichment via glycowork
+---
 
-Using the `glycowork` library:
+#### 5.2 Molecular Representations — Glycan Graphs & Structural Fingerprints *(Course: Week 1)*
+
+This section demonstrates that glycans, like small molecules, can be represented as molecular graphs — directly analogous to SMILES-based graph representations used throughout AI-for-chemistry.
+
+**5.2a Graph representations via `glycan_to_nxGraph`**
+- Convert each of the 5 identified biomarker glycans to a directed `NetworkX.DiGraph` using `glycowork.motif.graph.glycan_to_nxGraph`
+- Each node = a monosaccharide residue or glycosidic linkage; each edge = the covalent bond
+- Visualise the graph structure of each glycan using `networkx.draw` with monosaccharide labels as node annotations
+- Report graph-level properties: number of nodes, number of edges, tree depth, number of branching points, leaf count
+- Discussion: contrast glycan graph representation with SMILES and Morgan fingerprints used for small molecules
+
+**5.2b Structural fingerprints via `annotate_dataset`**
+- Compute structural fingerprints for all 5 biomarker glycans using `glycowork.motif.analysis.annotate_dataset(feature_set=['known', 'exhaustive'])` → 175-dimensional binary/count feature vectors
+- Each feature corresponds to a named structural motif (e.g., sialyl-Lewis-x, core fucose, LacNAc repeat)
+- Visualise: heatmap of motif presence across the 5 glycans (rows = glycans, columns = non-zero motifs)
+- Interpret: which structural motifs distinguish the biomarker glycans from each other?
+- Discussion: structural fingerprints as the glycan analogue of molecular fingerprints (ECFP, MACCS keys)
+
+---
+
+#### 5.3 Biological Enrichment via glycowork *(Course: Week 2 — applied ML on biological data)*
 
 **Disease Association Enrichment**
 - Cross-reference glycan sequences against `df_glycan.pkl` (reference database of ~50,500 glycans with disease labels)
 - Identify which identified glycans have known associations with lung cancer, other cancers, or inflammatory diseases
-- Use glycowork's built-in enrichment functions to test whether disease-associated glycans are overrepresented among the biomarker candidates
 
 **Protein Binding Enrichment**
 - Cross-reference against `glycan_binding.pkl` (>790,000 protein–glycan interactions)
 - Identify which glycan-binding proteins interact with the top biomarker glycans
-- Use glycowork to map interacting proteins to biological context (lectins, selectins, immune receptors)
 - Assess biological relevance to lung cancer
 
 **Species & Tissue Distribution**
-- Cross-reference against `df_species.pkl`
 - Identify whether top biomarker glycans are known to be expressed preferentially in lung tissue or tumour-associated tissues
 
-#### 5.3 Glycan Embedding via glycowork
+---
 
-- Use glycowork's built-in embedding tools to generate feature vectors for the identified glycans
-- Apply UMAP to the resulting feature matrix to produce a 2D visualisation
-- Colour points by: monosaccharide composition, disease association, tissue type, sialic acid content
-- For the top biomarker glycans, examine their nearest neighbours in the embedding space and assess whether they share disease associations or structural features
+#### 5.4 Structure-based Disease Classifier *(Course: Weeks 1+2 — ML on molecular structure)*
 
-#### 5.4 Embedding Quality Assessment
+This section trains a **second ML pipeline** that operates on **molecular structure** rather than LC-MS intensities. This contrasts directly with Phase 4 (which uses peak intensities) and demonstrates that disease-relevant information is encoded in glycan structure itself.
 
-- **N-glycan benchmark**: load `N_glycans_df.pkl` — known N-glycan sequences
-- Check that N-glycans cluster together in the embedding space (they share structural features)
-- Nearest-neighbour analysis: do the top biomarker glycans cluster with other disease-associated glycans?
+**Dataset construction**
+- Source: `df_glycan.pkl` — ~50,500 glycan sequences with `disease_association` labels
+- Binary label: `cancer_associated = 1` if any cancer appears in `disease_association`, else `0`
+- Class distribution: ~602 cancer-associated, ~49,859 unlabelled → extreme imbalance (1.2%)
+- Handle imbalance: use `class_weight='balanced'` in classifiers; report PR-AUC alongside ROC-AUC
+
+**Feature extraction (molecular representations → ML features)**
+- Extract 175-dim structural fingerprints from all glycan sequences using `annotate_dataset(feature_set=['known', 'exhaustive'])`
+- This is the glycan equivalent of computing molecular fingerprints from SMILES
+- Note: feature extraction may be slow on 50k sequences — sample a balanced subset if needed (all 602 positives + 5,000 randomly sampled negatives)
+
+**Model training**
+- **Logistic Regression (L2)**: linear baseline on structural features; compare to Phase 4 LR on intensity features
+- **Random Forest**: non-linear ensemble; compare feature importances (structural motifs) to Phase 4 RF importances (m/z peaks)
+- **XGBoost**: gradient-boosted trees (available via `xgboost==3.2.0`); typically strongest on tabular structural features
+- Split: stratified 80/20 train/test (stratify by cancer label)
+- Cross-validation: stratified 5-fold CV (inner loop) for hyperparameter tuning via `GridSearchCV`
+- Metrics: ROC-AUC, Precision-Recall AUC (primary — appropriate for imbalanced data), F1
+
+**Apply to the 5 biomarker glycans**
+- Run the trained classifier on the structural fingerprints of the 5 identified biomarkers
+- Report: predicted cancer-association probability for each glycan
+- Cross-reference: are the glycans predicted as cancer-associated the same ones flagged by the enrichment analysis in Phase 5.3?
+
+**Comparison to Phase 4**
+- Contrast: which approach (intensity-based or structure-based) achieves higher discriminability?
+- Discuss: intensity-based ML identifies *which samples are cancer patients*; structure-based ML identifies *which molecules are cancer-relevant* — fundamentally different questions, complementary insights
+
+---
+
+#### 5.5 Structural Embedding Space *(Course: Week 4 — unsupervised ML for chemical space exploration)*
+
+**UMAP of structural fingerprints**
+- Compute 175-dim structural fingerprints for a representative subset of `df_glycan` (all disease-associated glycans + random sample of unlabelled, ~2,000–5,000 total) using `annotate_dataset`
+- Apply UMAP (`n_neighbors=15`, `min_dist=0.1`, `metric='jaccard'` — appropriate for binary fingerprints)
+- Produce 2D embedding coloured by: (a) cancer vs healthy vs other disease, (b) glycan type (N/O/lipid), (c) sialic acid count, (d) fucosylation status
+- Overlay the 5 biomarker glycans as distinct markers on the UMAP
+
+**N-glycan benchmark**
+- Load `N_glycans_df.pkl` — known N-glycan sequences
+- Add to the UMAP; verify that N-glycans cluster together (structural coherence check)
+- If N-glycans do not cluster, the fingerprint features are not capturing gross structural class — would require investigation
+
+**Nearest-neighbour analysis**
+- For each of the 5 biomarker glycans, identify the 10 nearest neighbours in fingerprint space (using cosine or Jaccard distance)
+- Report: do the nearest neighbours share disease associations? Do they come from similar tissues?
+- This links structural similarity to biological similarity — a key AI-for-chemistry concept
+
+---
+
+#### 5.6 Biological Interpretation Narrative
+
+- Which structural motifs (from `annotate_dataset`) are most predictive of cancer association?
+- How do the 5 biomarker glycans relate to known cancer-associated glycans in the embedding space?
+- What protein interactions do the top glycans mediate — and what does this suggest about tumour biology?
+- Limitations: small positive class (602 cancer-associated), annotation bias toward well-studied glycans, composition-based matching uncertainty
 
 ---
 
@@ -423,8 +496,12 @@ Using the `glycowork` library:
 | Fig 6 | PCA + UMAP of cleaned data coloured by class | Phase 3 |
 | Fig 7 | Volcano plots (3 pairwise comparisons) | Phase 3 |
 | Fig 8 | Top features heatmap (samples × features) | Phase 3 |
-| Fig 9 | SHAP beeswarm | Phase 4 |
-| Fig 10 | Glycan embedding UMAP | Phase 5 |
+| Fig 9 | SHAP beeswarm + nested CV feature importance | Phase 4 |
+| Fig 10 | Glycan graph structures (5 biomarkers, NetworkX) | Phase 5.2 |
+| Fig 11 | Structural motif fingerprint heatmap (5 biomarkers × motifs) | Phase 5.2 |
+| Fig 12 | Structure-based classifier: ROC + PR curves; confusion matrix | Phase 5.4 |
+| Fig 13 | SHAP of structure-based classifier (top motifs driving cancer prediction) | Phase 5.4 |
+| Fig 14 | Structural embedding UMAP (disease / type / sialic acid colourings) | Phase 5.5 |
 
 Model comparison results, classification metrics, enrichment findings, and embedding neighbourhood analysis are reported in text and the results summary table rather than as standalone figures.
 
@@ -457,13 +534,13 @@ Model comparison results, classification metrics, enrichment findings, and embed
 | `scipy` | 1.14.1 | Statistical tests (ANOVA, Kruskal-Wallis, Shapiro-Wilk) |
 | `statsmodels` | 0.14.4 | Multiple testing correction (BH FDR), PLS-DA |
 | `scikit-learn` | 1.6.0 | PCA, UMAP preprocessing, ML classifiers, metrics |
-| `xgboost` | latest | Gradient boosting (available for supplementary comparison if time allows) |
+| `xgboost` | 3.2.0 | Gradient-boosted trees for structure-based disease classification (Phase 5.4) |
 | `shap` | latest | Model interpretability (SHAP values) |
-| `umap-learn` | latest | Non-linear dimensionality reduction |
+| `umap-learn` | 0.5.12 | Non-linear dimensionality reduction for structural embedding space (Phase 5.5) |
+| `networkx` | latest | Glycan graph representation and graph property extraction (Phase 5.2) |
 | `matplotlib` | 3.10.0 | Core plotting |
 | `seaborn` | 0.13.2 | Statistical visualisation (heatmaps, violin plots) |
-| `bokeh` | 3.9.0 | Interactive visualisations |
-| `glycowork` | 1.7.1 | Glycan sequence analysis, enrichment, embedding |
+| `glycowork` | 1.7.1 | `glycan_to_nxGraph` (graph representations), `annotate_dataset` (structural fingerprints), biological enrichment |
 | `glycorender` | 0.2.5 | Glycan structure rendering |
 | `ipython` | 8.39.0 | Interactive notebook environment |
 
@@ -477,13 +554,15 @@ By the end of this project, we expect to produce:
 
 2. **A ranked list of glycan biomarker candidates** — features statistically significant across multiple tests (ANOVA, volcano plot, PLS-DA VIP, SHAP), with m/z and RT annotations
 
-3. **A comparative ML classification analysis** — Logistic Regression and Random Forest evaluated via 5-fold stratified CV, with results interpreted in terms of model behaviour, feature consistency, and separation between disease states rather than against a fixed benchmark
+3. **A comparative ML classification analysis** — Logistic Regression and Random Forest evaluated via 5-fold stratified CV and nested CV, with SHAP interpretability and unbiased feature importance rankings
 
-4. **SHAP-based molecular interpretations** — connecting model predictions to specific glycan features and their biological roles
+4. **A structure-based disease classifier** — XGBoost / RF trained on glycan structural fingerprints (from the 50k-entry reference database) to predict cancer association from molecular structure alone; applied to the 5 identified biomarkers
 
-5. **An annotated glycan embedding space** — a 2D UMAP representation of the identified glycans, coloured by composition, disease association, and protein interaction profile
+5. **Molecular graph representations** — directed NetworkX graphs for each biomarker glycan, with graph property analysis and visual comparison to small-molecule representations
 
-6. **Enrichment insights** — identification of which disease-relevant proteins interact with the top biomarker glycans, suggesting candidate biological pathways
+6. **An annotated structural embedding space** — UMAP of 175-dim structural fingerprints coloured by disease association, glycan type, and sialic acid content; N-glycan cluster benchmark; nearest-neighbour analysis for the 5 biomarkers
+
+7. **Enrichment insights** — disease, tissue, species, and protein binding enrichment for the identified biomarkers via the glycowork reference databases
 
 7. **A fully documented Jupyter notebook workflow** — reproducible, well-commented code for each analysis step
 
