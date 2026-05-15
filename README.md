@@ -1,200 +1,242 @@
-&nbsp; 
-&nbsp; 
-&nbsp; 
-[<img src="public/221006-logo-isospec-color.jpg" width="250" align="right">]()
-&nbsp; 
-&nbsp; 
-&nbsp; 
-&nbsp; 
-&nbsp; 
-&nbsp; 
-&nbsp; 
-# Machine Learning Internship Assignment 
+&nbsp;
 
+[<img src="public/221006-logo-isospec-color.jpg" width="200" align="right">]()
 
-&nbsp; 
-&nbsp; 
+&nbsp;
 
-Welcome to your internship assignment! This two-week challenge is designed to evaluate your data science and machine learning capabilities through two interconnected tasks that reflect our team's actual workflow.
+# AI for Chemistry: Glycan Biomarker Discovery for Lung Cancer Detection
 
-Our will is that after completion, you have a rough understanding of the domain and a first taste of how your internship would unfold. 
+&nbsp;
 
-We will introduce to you the domain of glycobiology and the tools we use to characterize glycans. You are not expected to be an expert in the domain and 
-we will provide you with the necessary background. In any case we also provide you with complementary resources for further explanation.
+A machine learning pipeline for discovery and molecular interpretation of glycan biomarkers in LC-MS data from a multi-cohort lung cancer study. Data was provided by [Isospec](https://isospec.io/), a biotech startup specializing in glycan characterization technology.
 
-The assignment has two parts, a first more focused on data exploration, processing, and statistical analysis. The second is more focused on machine learning. We aim to assess your abilty to observe, question and test in the first part (scientific method) followed by your ability to structure for training, evaluating and creating value with machine learning. 
+---
 
-**Important Note:** You have to be cautious on time management, we recommend a 40-60 split between the two parts. We understand EDA and data wrangling can be time consumming so make sure not to fall into that trap. 
+## Project Overview
 
-Enjoy :) ! 
-## Introduction: What are Glycans?
-Glycans are complex sugar molecules that attach to proteins and lipids on cell surfaces and in blood, playing crucial roles in cellular communication, immune response, and disease progression. These molecules undergo significant changes during disease development, making them valuable biomarkers for early detection and monitoring of various conditions including cancer. Their presence in blood and structural diversity make glycans particularly attractive targets for diagnostic development, as changes in their abundance or composition can signal specific disease states before other symptoms appear.
+Glycans are complex sugar molecules attached to proteins and lipids on cell surfaces and in blood. They undergo significant structural and abundance changes during disease progression, making them attractive candidates for early diagnostic biomarkers. This project applies end-to-end data science and machine learning to a glycomic LC-MS dataset to:
 
-## Task 01: Biomarker Discovery
-In this first phase, you are provided with a task that is very similar to the typical data science tasks our team has to work on. Your role is to find biological differences in molecular expression specific to disease patients or healthy controls. Your skills should allow you to understand the data you are provided, clear out the noise and extract the signal we are after. In the typical workflow at ISOSPEC this means finding molecules of interest that we later on characterize with our proprietary breakthrough technology (CIRIS). 
-### Background
+1. **Discover statistically significant and discriminative glycan biomarkers** from peak area intensities across lung cancer, benign disease, and healthy control cohorts.
+2. **Interpret discovered biomarkers at the molecular level** by placing them in the context of known glycan structures, disease associations, and protein interactions using structure-based ML and embedding analysis.
 
-#### Chromatographic Peaks
+---
 
-After data engineering team processed the results from LC-MS experiments of lung cancer patients cohort study run by our laboratory, you are looking to analyse the differential expression of glycans between classes of interest, namely disease and control. Molecules under study are cleaved glycans off of proteins running in blood samples. Experiment read out consists of list of Chromatographic peaks, that can be described with three main information points: Retention time (time took to migrate through LC column) indicative of the molecules conformation, Mass to charge ratio from the detector, indicative of mass composition and intensity of detection, absolute value indicative of abundance of the molecule. Chromatographic peaks height (intensity) and shape are important information to assess the quality of the signal and the relative abundance of the molecule. As such the peak area, integration of the curve in the time domain bound by peak start and end is the metric used to quantify presence.
+## Dataset
 
-Put simply:
+**Source:** Isospec — LC-MS glycomics experiment on a lung cancer cohort study
 
-• Retention time shows when molecule emerges from the column\
-• Mass to charge ratio indicates molecular composition\
-• Peak intensity represents molecule abundance\
-• Peak area is our quantitative measure
+| Property | Value |
+|---|---|
+| Cohorts | Lung cancer (French, n=26), Benign disease (LMU, n=26), Healthy control (Dunn, n=27) |
+| Raw features | 252 LC-MS chromatographic peaks |
+| Features after QC | 194 (77% retention) |
+| Identified glycans | 5 sequences characterized via CIRIS technology |
+| Reference database | ~50,500 glycan sequences (glycowork `df_glycan`) |
+| Protein-binding data | >790,000 interactions from >2,000 proteins (`glycan_binding`) |
 
-#### LC-MS Experiments
+Each feature is described by its retention time (RT), mass-to-charge ratio (m/z), and peak area intensity. Sample classes include biological samples, pooled quality controls (QC), blanks, and system suitability standards.
 
-LC-MS experiments follow a strict framework to reduce the **variability of the analytical platform** in the data. This framework is composed of different blocks reproduced identically through multiple batches. A schematic description of a batch is shown below:
-![Sample List Organization](public/sample-list.png)
+---
 
-*Figure 1: Schematic representation of a typical batch showing the order and organization of different sample types. Blanks and System Suitability samples are run first, followed by alternating patterns of disease samples, controls, and quality checks.*
-In essence, a block contains different sample types or "class" run in a specific order:
-- **Blank samples**: No biological information, used to assess contaminants. Consider the Zero, Solvant and Blank samples of the schema. 
-- **System Suitability (SS)**: Contains exogenous standards for monitoring detector behavior. Consider the SSS and SS Conditionnig samples of the schema. Experimental_blank is considered as a SS sample.
-- **Disease/Control samples**: Main samples of interest, in the schema shown as RM and SRM. 
-- **Quality Checks (QC or dQC)**: Mixture of all samples to monitor signal consistency. Pooled QC in the schema. dQC is a diluted version of the QC and can also be considered a normal QC 
+## Repository Structure
 
-Do not worry about the technical details of the experiment, you must gather at this stage samples have different class and purposes within the experiment. 
-Your input data is summarized in three files, all in `data/input` in csv format:
-1. **Data Matrix** (NxM): 
-- Rows: Sample IDs (N samples) 
-- Columns: Feature IDs (M features) 
-- Values: Peak areas
+```
+AI4chem/
+├── Notebooks/
+│   ├── 00_environment_check.ipynb       Environment and dependency verification
+│   ├── 01_data_loading.ipynb            Raw data ingestion and alignment
+│   ├── 02_eda.ipynb                     Exploratory data analysis
+│   ├── 03_preprocessing.ipynb           QC filtering and normalization
+│   ├── 04_statistical_analysis.ipynb    Univariate tests, PLS-DA, volcano plots
+│   ├── 05_ml_classification.ipynb       ML classification, SHAP, nested CV
+│   ├── 06_glycan_enrichment.ipynb       Disease/tissue/protein enrichment
+│   ├── 07_glycan_embedding.ipynb        Structure-based ML and UMAP embedding
+│   └── 08_summary_figures.ipynb         Publication-ready figure panel
+├── files/
+│   ├── data/
+│   │   ├── input/                       Raw LC-MS CSV files
+│   │   ├── processed/                   Intermediate pickle files
+│   │   └── glycan_embedding/            Glycowork reference databases + identified glycans
+│   └── results/                         statistical_results.pkl, model_results.pkl,
+│                                        enrichment_results.pkl, embedding_results.pkl
+├── figures/                             PNG figures from all analysis phases
+├── requirements.txt
+└── README.md
+```
 
-2. **Feature Metadata** (MxK): 
-- Rows: Feature IDs (M features)
-- Columns: Feature descriptors (RT, m/z) (K descriptors)
-3. **Acquisition List** (NxD): 
-- Sample metadata including batch and run order (D descriptors)
-- Rows: Sample IDs (N samples)
-4. **Exogenous Standards** (Sxk):
- - Rows: Exogenous standards IDs (S standards): They are identified by GUn corresponding to the glycan unit, e.g. GU4 is composed of four glycan units from a Maltodextrin ladder.
-  - Columns: Feature descriptors (RT, m/z) (k descriptors)
+---
 
-### A - Exploratory Data Analysis
-Your first task is to inspect the data, understand the dynamics at hand and perform necessary analysis to assess if the experiments is exploitable for biomarker discovery. 
+## Methods
 
-As the analytical platform can introduce measurement bias, it's crucial to monitor both technical variability (from the instrument) and biological variability (true differences between samples).
+### Phase 1 — Exploratory Data Analysis (`02_eda.ipynb`)
 
-Some metrics to consider:
-- Coefficient of variation (CV): Captures variability in peak area across samples
-- D-Ratio: Compares technical to biological variation
+- Feature map visualization across m/z × retention time space
+- Isomer and isotope/adduct detection
+- Blank contamination assessment: 0 features flagged (glycan mass range is intrinsically clean)
+- Exogenous standard recovery: all 4 spiked-in standards detected at expected m/z and RT
+- Coefficient of Variation (CV) on QC samples: **78.2% of features have CV < 30%**
+- D-Ratio analysis to compare technical vs. biological variation
 
-You can find more on these metrics in the resources section.
+### Phase 2 — Preprocessing (`03_preprocessing.ipynb`)
 
+Four sequential filters applied:
 
-To guide your analysis, consider these questions:
-1. Are there features that could correspond to isomers (same mass but diffrent retention time)?
-2. Are there features that could correspond to isotopes or adducts (same retention time but different mass)
-3. Is there any correlation (in terms of peak area) between isomers ? between isotopes? 
-4. How many features have been detected, how is the distribution of detection rate across mz and retention time, and across classes? **NB:** you can set a threshold of minimal intensity to consider a peak detected. 
-   - How do you interpret differences between QC classes and sample classes? Does it correspond to an expected behavior? 
-5. How is the contamination in the experiment? How would you mitigate this effect moving forward?
-6. Are the standards detected consistently across the experiment?
-7. How is the distribution of intensities across the classes? Are there any trends with respect to classes, run order? 
-   - How do you interpret differences? Does it correspond to expected behavior? 
-8. How are QCs between the batches? How would you qualify measurement stability?
+| Filter | Criterion | Removed |
+|---|---|---|
+| Mass range | m/z > 500 Da (glycan-sized) | 4 |
+| Prevalence | ≥ 70% detection in at least one biological class | 0 |
+| QC CV | < 30% | 55 |
+| Contamination | Blank/bio ratio ≤ 30% | 0 |
 
-You are encouraged to provide figures, summary statistics to motivate any insights you gather. Feel free to expand from these questions to interrogate other aspects of the data. Make sure to analyze each figure, we judge the quality of the EDA from your ability to connect discoveries. It is preferred to limit the insights to a few but thouroughly explored rather than point out various obervations wihtout much depth. 
+**Result: 194 features retained (77%)**
 
-**Important Note:** For the following parts of this exercise we ask you to limit the analysis to only batch1 since batch2 does not contain any sample data.
-### B - Data Processing
-As you go about finding discriminative signals, you'll need to process your features in order to ensure consistency in their detection and comparability between samples. For that, filtering of the features and of the samples investigated is key for meaningful discovery. Think of this as cleaning your signal - just as a radio needs tuning to pick up a clear broadcast, we need to tune our data to hear the biological signal clearly through the technical noise.
-Qualitative features should follow at least these criteria:
-- Limited variability across samples of the same class (<30% on the QC)
-- Consistent support in detection (>=70%) on the same class
-- Within mass range of interest (Glycans > 500 m/z)
+Normalization pipeline:
+- Half-minimum imputation (< 1% missing data)
+- Log₂ transformation
+- Probabilistic Quotient Normalization (PQN) for sample loading correction
+- Run-order drift flag: 30 features with monotonic decay detected (not confounded with class, Kruskal-Wallis p = 0.257)
 
-Make sure to interrogate the samples as well - as errors can happen! Monitor the sample-to-sample intensity variations and check for possible transformations that could improve comparability. 
+### Phase 3 — Statistical & Discriminatory Analysis (`04_statistical_analysis.ipynb`)
 
-The instrument accuracy and experimental conditions vary as the run goes on, as such this step is critical to monitor the impact on the detected features. Questioning intensities here is central!
+- **PCA:** 46% variance explained in PC1–PC2; 7–8 components reach 80% cumulative variance
+- **UMAP:** Non-linear embedding reveals well-separated disease clusters
+- **Univariate testing:** Kruskal-Wallis + Benjamini-Hochberg FDR correction
+  - **181 / 194 features significant** (q < 0.05)
+  - Median effect size (η²) = 0.45 (large)
+- **Volcano plots:** |log₂FC| > 1 AND q < 0.05 identifies high-magnitude candidates
+  - FT-174: +4.4 log₂FC (21-fold up in cancer vs healthy)
+  - FT-172: +3.4 log₂FC (10-fold up in cancer vs healthy)
+- **PLS-DA:** Q² = 0.949 (in-sample); LOO-CV Q² = 0.956; permutation test p = 0.000
 
-The output of this phase should be a list of features and samples you will leverage for doing biomarker discovery. You should provide justifications for their selection or the removal of others - every choice matters when we're looking for reliable biomarkers.
+### Phase 4 — Machine Learning Classification (`05_ml_classification.ipynb`)
 
-### C - Discriminatory Analysis 
+Models trained on 79 biological samples × 194 features:
 
-In this final step your role is to showcase your skills for extracting meaningful patterns from our experimental data. You will leverage the curated list of features to find a subset of them that captures most biological differences between classes. Here, little guidance is provided as we expect motivating the discovery of a biomarker should be one of your strong suits. Keep in mind that statistical significance, predictive power and decision boundaries are important concepts when justifying such discovery. A sense of hierarchy should also be provided in the final list of targets.
+| Model | CV Macro F1 | Test F1 | Test AUC |
+|---|---|---|---|
+| Logistic Regression (L2) | 1.0 | 1.0 | 1.0 |
+| Random Forest | 1.0 | 1.0 | 1.0 |
 
-**Important Note:** You can consider the following class mapping for the analysis:
-- French: Lung cancer
-- LMU: Benign disease
-- Dunn: Healthy
+Validation strategy:
+- Leave-One-Out CV balanced accuracy: **1.0**
+- Repeated 5-fold CV (10 repeats): **1.0 ± 0.0**
+- Nested 5-fold CV (unbiased estimate): **all 5 outer folds achieve F1 = 1.0**
 
-## Task 02: Biomarker Embedding
-In this second phase, your role is to provide interpretation power to your findings. Following the discovery of a biomarker, you are tasked with leveraging third party knowledge around the structure you identified to provide more insights on the origin of this glycan, other diseases it has been identified and proteins it is related to. 
-The laboratory team has successfully identified your discovered molecules using CIRIS technology, providing glycan sequences and structural compositions in the `glycan_list.csv` file. Now comes the exciting challenge of placing these discoveries in the broader context of glycobiology.
-You have access to the glycowork library, a comprehensive glycan dataset which contains, as described by the authors:
-- df_glycan: contains ~50,500 unique glycan sequences, including labels such as ~39,500 species associations, ~20,000 tissue associations, and ~1,000 disease associations
-- glycan_binding: contains >790,000 protein-glycan binding interactions, from >2,000 unique glycan-binding proteins
+SHAP feature importance computed for both models. Cross-method consensus (RF SHAP, LR SHAP, statistical composite) identifies **6 overlapping top-20 features**. Unbiased nested-CV consensus panel: **FT-046, FT-049, FT-050, FT-070** (m/z ~1004–1004.7 Da, RT ~1156 s, η² = 0.97–0.98).
 
-Your task is to create an embedding space for the glycan libraries that captures meaningful relationships between molecules such as sequence proximity, origin similarity, disease commonalities and proteins they interact with. You will then embed your discovered glycans and assess their closeness to other structures to draw conclusions as to their nature. The embedding space can be learned by leveraging the features provided in the glycan_list columns: 
- - `glycan_sequence`: Glycan sequence
- - `composition`: Composition of the glycan
- - `tissue_sample`: Medium sample collected
- - `tissue_species`: Species associated with the sample collected
+### Phase 5a — Glycan Enrichment (`06_glycan_enrichment.ipynb`)
 
-You can validate your learned representation by assessing the closeness of the N-glycans in the new embedding space. The N-glycans list is provided in the N-Glycans.pkl. You can refer to the glycowork notebooks [glycowork example notebooks](https://github.com/BojarLab/glycowork/blob/master/) for more information on the N-glycans.
-For this task, head to the data/glycan_embedding folder. You will find the following files:
-- glycan_list.csv: The list of glycans you will embed for inference and enrichment.
-- df_glycan.pkl: The glycan sequences to use for the learning of the embedding space.
-- glycan_binding.pkl: The protein-glycan binding interactions to enrich the embedding space.
-- N_glycans_df.pkl: The N-glycans sequences to use for control representation of the embedding space (also used for learning the embedding space)
+Five glycans identified by CIRIS technology were annotated against the glycowork reference database:
 
-The expected output is the enriched list of glycans with information as well as evidence for the utility of the embedding space you created. The more new information you can gather on the structures, the better. Be creative in the approaches you consider - any choice should be justified and insights drawn motivated.
+| Glycan | Composition | DB Match | Cancer Diseases |
+|---|---|---|---|
+| G0F2 | dHex₂Hex₃HexNAc₄ | 73 composition matches | colorectal (1) |
+| A1F1 | Neu5Ac₁Hex₄HexNAc₄dHex₁ | 53 composition matches | colorectal (6), gastric (1) |
+| A2G2S1 | Neu5Ac₁Hex₅HexNAc₄ | **1 exact match** | — (1663 protein interactions) |
+| A1G1S1 | Neu5Ac₁Hex₄HexNAc₄ | **1 exact match** | — (1585 protein interactions) |
+| A2G2F1 | dHex₁Hex₅HexNAc₅ | **1 exact match** | — |
 
-In this part, we are very interested in your approach in setting up a machine learning model. As such we expect you to build understanding with simpler, more interpretable algorithms to bechmark performances. You can than build up with more complex architectures and provide numerical evidence of the improvements provided. 
-# Submission Process
-### Repository Setup
+Top enriched disease terms across all 5 glycans: colorectal cancer (7), gastric cancer (1), lung NSCC (1), esophageal cancer (1), breast cancer (1). Dominant tissue associations: gastric mucosa, blood serum, lung epithelium.
 
-1. Clone the assignment repository from this [repository](https://github.com/isospec/ml-internship) to your own repository.
-2. Create a new branch for your work, in your own repository.
-3. Commit your changes regularly with clear, descriptive messages.
-4. When complete, create a pull request, in your repository, and share the pull request with us.
+Each glycan was converted to a directed graph representation (NetworkX) with monosaccharide nodes and glycosidic linkage edges for structure visualization.
 
-### Required Documents your submission should include:
-1. All code and analysis files
-2. A reflection.md document containing: 
-   - Time spent on each section (E.g 8-10 days Task 1, 4-6 days Task 2) 
-   - Perceived difficulty of different components 
-   - Discussion of what worked well 
-   - Challenges encountered and how you addressed them 
-   - Any feedback on the assignment structure
+### Phase 5b — Structure-Based Classification (`07_glycan_embedding.ipynb`)
 
-# Technical Requirements
+**Goal:** Predict cancer association from glycan molecular structure alone, independent of LC-MS.
 
-## Environment Setup
+Training set: 1,500 glycans (501 cancer-associated + 999 non-cancer) from `df_glycan`. Features: 1,445 structural motif fingerprints via `glycowork.annotate_dataset`. Label: binary (any cancer/carcinoma/tumor in disease association).
 
-Use the `requirements.txt` file to install all dependencies with any package manager of your choice. For example, with conda:
+| Model | ROC-AUC | PR-AUC |
+|---|---|---|
+| Logistic Regression | 0.922 | 0.825 |
+| Random Forest | 0.885 | 0.788 |
+| **XGBoost** | **0.921** | **0.843** |
+
+Top structural motifs by XGBoost gain: **Neu5Ac (sialic acid, gain 0.0747)**, GlcNAc(b1-4/6)Man (0.0664), Internal LacNAc type-2 (0.0267).
+
+Cancer probability predictions for the 5 identified biomarker glycans:
+
+| Glycan | P(cancer) | Structural verdict |
+|---|---|---|
+| A1F1 | 0.528 | Cancer |
+| A2G2S1 | 0.520 | Cancer |
+| A1G1S1 | 0.514 | Cancer |
+| A2G2F1 | 0.279 | Not cancer |
+| G0F2 | 0.128 | Not cancer |
+
+### Phase 5c — UMAP Embedding & Nearest-Neighbour Analysis (`07_glycan_embedding.ipynb`)
+
+UMAP embedding of 1,505 glycans (1,500 training + 5 biomarkers) using Jaccard distance on structural fingerprints (n_neighbors=15, min_dist=0.1). K=10 nearest-neighbour cancer enrichment (background rate: 33%):
+
+| Glycan | Cancer neighbours / 10 | Mean Jaccard dist |
+|---|---|---|
+| A1F1 | 7/10 (70%) | 0.563 |
+| A1G1S1 | 7/10 (70%) | 0.594 |
+| A2G2S1 | 6/10 (60%) | 0.590 |
+| G0F2 | 5/10 (50%) | 0.513 |
+| A2G2F1 | 4/10 (40%) | 0.632 |
+
+---
+
+## Key Findings
+
+### Task 1 — Biomarker Discovery
+
+- **Perfect three-class discrimination** achieved: both Logistic Regression and Random Forest reach F1 = 1.0 and AUC = 1.0, validated by nested cross-validation.
+- **4-feature consensus biomarker panel** (FT-046, FT-049, FT-050, FT-070): unbiased across all validation strategies, explaining 97–98% of between-class variance.
+- **High-magnitude outliers** FT-172 and FT-174 show 10–21× fold-increase in cancer vs healthy — strong biological signal but near the analytical limit of detection in QC.
+- **181 of 194 features** are statistically significant after FDR correction, indicating broad glycome remodelling across disease classes.
+
+### Task 2 — Molecular Interpretation
+
+- **Three sialylated glycans** (A1F1, A2G2S1, A1G1S1) show convergent evidence across three independent lines of analysis:
+  - Structural cancer probability > 0.50 (XGBoost)
+  - 7/10 cancer-labelled structural neighbours in UMAP space
+  - Exact database matches with documented human protein binding and tissue associations
+- **Sialic acid (Neu5Ac) is the dominant cancer-predictive structural motif**, consistent with the known role of hypersialylation in cancer progression.
+- **Two non-sialylated glycans** (G0F2, A2G2F1) have lower structural cancer scores and sparser nearest-neighbour cancer enrichment; their discriminatory power in the LC-MS data may reflect cancer-specific expression remodelling rather than a globally conserved cancer structural signature.
+
+---
+
+## Reproducibility
+
+### Environment Setup
 
 ```bash
-conda create -n ai4chem python=3.11
+conda create -n ai4chem python=3.10
 conda activate ai4chem
 pip install -r requirements.txt
 ```
-The provided packages are not exhaustive, you are free to use any other package you deem necessary for your work.
 
-### Project Organization
+### Running the Analysis
 
-- Clear directory structure separating data, code, and results
-- Comprehensive README.md explaining setup and workflow
-- Well-documented code following PEP 8 guidelines
-- Proper error handling and input validation
+Notebooks are numbered and should be run in order. Each notebook saves its outputs to `files/results/` as pickle files, which are loaded by subsequent notebooks.
 
-### Evaluation Criteria
+```
+00 → 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08
+```
 
-- Analytical rigor and statistical soundness
-- Biological insight and interpretation depth
-- Code quality and reproducibility
-- Clear communication of methods and results
-- Creative problem
-- Solving approach
+### Dependencies
 
-### Resources
-- [LC MS Experiment](https://pyopenms.readthedocs.io/en/latest/user_guide/background.html)
-- [D-Ratio](https://pmc.ncbi.nlm.nih.gov/articles/PMC10222478/)
-- [Coefficient of Variation](https://pmc.ncbi.nlm.nih.gov/articles/PMC3695475/)
-- [Glaycan Analysis](https://www.mdpi.com/2218-273X/13/4/605)
-- [Glycowork](https://github.com/BojarLab/glycowork)
+Core libraries used:
+
+| Category | Libraries |
+|---|---|
+| Data | pandas 2.3.3, numpy 2.2.1 |
+| Statistics | scipy 1.14.1, statsmodels 0.14.4 |
+| Machine Learning | scikit-learn 1.6.0, xgboost 3.2.0 |
+| Interpretability | shap 0.49.1 |
+| Dimensionality Reduction | umap-learn 0.5.12 |
+| Glycan-specific | glycowork 1.7.0, glycorender 0.1.0, networkx 3.4.2 |
+| Visualization | matplotlib 3.10.0, seaborn 0.13.2 |
+
+---
+
+## Resources
+
+- [LC-MS Background — PyOpenMS](https://pyopenms.readthedocs.io/en/latest/user_guide/background.html)
+- [D-Ratio (technical vs biological variation)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10222478/)
+- [Coefficient of Variation in LC-MS](https://pmc.ncbi.nlm.nih.gov/articles/PMC3695475/)
+- [Glycan Analysis Review](https://www.mdpi.com/2218-273X/13/4/605)
+- [Glycowork library](https://github.com/BojarLab/glycowork)
+- [Isospec — CIRIS technology](https://isospec.io/)
